@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(description='Train video model with cross entro
 # Datasets
 parser.add_argument('-d', '--dataset', type=str, default='mars',
                     choices=data_manager.get_names())
-parser.add_argument('-j', '--workers', default=4, type=int,
+parser.add_argument('-j', '--workers', default=0, type=int,
                     help="number of data loading workers (default: 4)")
 parser.add_argument('--height', type=int, default=224,
                     help="height of an image (default: 224)")
@@ -40,7 +40,7 @@ parser.add_argument('--max-epoch', default=800, type=int,
                     help="maximum epochs to run")
 parser.add_argument('--start-epoch', default=0, type=int,
                     help="manual epoch number (useful on restarts)")
-parser.add_argument('--train-batch', default=32, type=int,
+parser.add_argument('--train-batch', default=16, type=int,
                     help="train batch size")
 parser.add_argument('--test-batch', default=1, type=int, help="has to be 1")
 parser.add_argument('--lr', '--learning-rate', default=0.0003, type=float,
@@ -57,14 +57,14 @@ parser.add_argument('--num-instances', type=int, default=4,
 parser.add_argument('--htri-only', action='store_true', default=False,
                     help="if this is True, only htri loss is used in training")
 # Architecture
-parser.add_argument('-a', '--arch', type=str, default='resnet50tp', help="resnet503d, resnet50tp, resnet50ta, resnetrnn")
+parser.add_argument('-a', '--arch', type=str, default='resnet50ta', help="resnet503d, resnet50tp, resnet50ta, resnetrnn")
 parser.add_argument('--pool', type=str, default='avg', choices=['avg', 'max'])
 
 # Miscs
 parser.add_argument('--print-freq', type=int, default=80, help="print frequency")
 parser.add_argument('--seed', type=int, default=1, help="manual seed")
 parser.add_argument('--pretrained-model', type=str, default='/home/jiyang/Workspace/Works/video-person-reid/3dconv-person-reid/pretrained_models/resnet-50-kinetics.pth', help='need to be set for resnet3d models')
-parser.add_argument('--evaluate', action='store_true', help="evaluation only")
+parser.add_argument('--evaluate', action='store_false', help="evaluation only")
 parser.add_argument('--eval-step', type=int, default=50,
                     help="run evaluation for every N epochs (set to -1 to test after training)")
 parser.add_argument('--save-dir', type=str, default='log')
@@ -213,7 +213,7 @@ def train(model, criterion_xent, criterion_htri, optimizer, trainloader, use_gpu
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        losses.update(loss.data[0], pids.size(0))
+        losses.update(loss.item(), pids.size(0))
 
         if (batch_idx+1) % args.print_freq == 0:
             print("Batch {}/{}\t Loss {:.6f} ({:.6f})".format(batch_idx+1, len(trainloader), losses.val, losses.avg))
@@ -226,13 +226,13 @@ def test(model, queryloader, galleryloader, pool, use_gpu, ranks=[1, 5, 10, 20])
         if use_gpu:
             imgs = imgs.cuda()
         imgs = Variable(imgs, volatile=True)
-        # b=1, n=number of clips, s=16
-        b, n, s, c, h, w = imgs.size()
+        # b=1, n=number of clips, s=4
+        b, n, s, c, h, w = imgs.size() # batch, num, clip (4frames), c, h ,w
         assert(b==1)
         imgs = imgs.view(b*n, s, c, h, w)
-        features = model(imgs)
+        features = model(imgs) # shape (n, 2048)
         features = features.view(n, -1)
-        features = torch.mean(features, 0)
+        features = torch.mean(features, 0) # shape 2048
         features = features.data.cpu()
         qf.append(features)
         q_pids.extend(pids)

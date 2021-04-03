@@ -30,7 +30,7 @@ class Mars(object):
     Args:
         min_seq_len (int): tracklet with length shorter than this value will be discarded (default: 0).
     """
-    root = './data/mars'
+    root = '../data/mars'
     train_name_path = osp.join(root, 'info/train_name.txt')
     test_name_path = osp.join(root, 'info/test_name.txt')
     track_train_info_path = osp.join(root, 'info/tracks_train_info.mat')
@@ -41,9 +41,9 @@ class Mars(object):
         self._check_before_run()
 
         # prepare meta data
-        train_names = self._get_names(self.train_name_path)
+        train_names = self._get_names(self.train_name_path) # train picture name
         test_names = self._get_names(self.test_name_path)
-        track_train = loadmat(self.track_train_info_path)['track_train_info'] # numpy.ndarray (8298, 4)
+        track_train = loadmat(self.track_train_info_path)['track_train_info'] # numpy.ndarray (8298, 4) (starts_frame, ends_frame, person_id, camera_id)
         track_test = loadmat(self.track_test_info_path)['track_test_info'] # numpy.ndarray (12180, 4)
         query_IDX = loadmat(self.query_IDX_path)['query_IDX'].squeeze() # numpy.ndarray (1980,)
         query_IDX -= 1 # index from 0
@@ -113,9 +113,25 @@ class Mars(object):
         return names
 
     def _process_data(self, names, meta_data, home_dir=None, relabel=False, min_seq_len=0):
+        """
+
+        Args:
+            names (list): total image names
+            meta_data (ndarray): tracklet information with n x 4,  [starts_frame, ends_frame, person_id, camera_id]
+            home_dir (srt): 'bbox_train' or 'bbox_test'
+            relabel (bool): whether to relabel pid from 0
+            min_seq_len (int): tracklet length should larger than min_seq_len
+
+        Returns:
+            tracklets (list): list with tuple 3 (image_names, pid, camera_id)
+            num_tracklets (int):
+            num_pids (int):
+            num_imgs_per_tracklet (list):
+        """
+
         assert home_dir in ['bbox_train', 'bbox_test']
         num_tracklets = meta_data.shape[0]
-        pid_list = list(set(meta_data[:,2].tolist()))
+        pid_list = list(set(meta_data[:,2].tolist())) # set for not repeat id
         num_pids = len(pid_list)
 
         if relabel: pid2label = {pid:label for label, pid in enumerate(pid_list)}

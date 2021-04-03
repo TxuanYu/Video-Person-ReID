@@ -38,7 +38,7 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, index):
         img_paths, pid, camid = self.dataset[index]
-        num = len(img_paths)
+        num = len(img_paths) # nums of image per tracklet
         if self.sample == 'random':
             """
             Randomly sample seq_len consecutive frames from num frames,

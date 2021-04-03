@@ -19,15 +19,15 @@ class ResNet50TP(nn.Module):
         self.classifier = nn.Linear(self.feat_dim, num_classes)
 
     def forward(self, x):
-        b = x.size(0)
-        t = x.size(1)
-        x = x.view(b*t,x.size(2), x.size(3), x.size(4))
-        x = self.base(x)
-        x = F.avg_pool2d(x, x.size()[2:])
-        x = x.view(b,t,-1)
-        x=x.permute(0,2,1)
-        f = F.avg_pool1d(x,t)
-        f = f.view(b, self.feat_dim)
+        b = x.size(0) # batch size
+        t = x.size(1) # tracklet size
+        x = x.view(b*t,x.size(2), x.size(3), x.size(4)) # shape (b*t, 3, w, h)
+        x = self.base(x) # shape (b*t, 2048, 7, 4)
+        x = F.avg_pool2d(x, x.size()[2:]) # kernel size (7, 4) to shape (b*t, 2048, 1, 1)
+        x = x.view(b,t,-1) # shape (b, t, 2048)
+        x = x.permute(0,2,1) # shape (b, 2048, t)
+        f = F.avg_pool1d(x,t) # kernel size t to shape (b, 2048, 1)
+        f = f.view(b, self.feat_dim) # shape (b, 2048)
         if not self.training:
             return f
         y = self.classifier(f)
@@ -55,16 +55,16 @@ class ResNet50TA(nn.Module):
         self.attention_conv = nn.Conv2d(self.feat_dim, self.middle_dim, [7,4]) # 7,4 cooresponds to 224, 112 input image size
         self.attention_tconv = nn.Conv1d(self.middle_dim, 1, 3, padding=1)
     def forward(self, x):
-        b = x.size(0)
-        t = x.size(1)
-        x = x.view(b*t, x.size(2), x.size(3), x.size(4))
-        x = self.base(x)
-        a = F.relu(self.attention_conv(x))
-        a = a.view(b, t, self.middle_dim)
-        a = a.permute(0,2,1)
-        a = F.relu(self.attention_tconv(a))
-        a = a.view(b, t)
-        x = F.avg_pool2d(x, x.size()[2:])
+        b = x.size(0) # batch size
+        t = x.size(1) # tracklet size
+        x = x.view(b*t, x.size(2), x.size(3), x.size(4)) # shape (b*t, 3, w, h)
+        x = self.base(x) # shape (b*t, 2048, 7, 4)
+        a = F.relu(self.attention_conv(x)) # shape (24, 256, 1, 1)
+        a = a.view(b, t, self.middle_dim) # shape (b, t, 256)
+        a = a.permute(0,2,1) # shape (b, 256, t)
+        a = F.relu(self.attention_tconv(a)) # shape (b, 1, t)
+        a = a.view(b, t) # shape (b, t)
+        x = F.avg_pool2d(x, x.size()[2:]) # shape (b*t, 2048, 1, 1)
         if self. att_gen=='softmax':
             a = F.softmax(a, dim=1)
         elif self.att_gen=='sigmoid':
@@ -78,7 +78,7 @@ class ResNet50TA(nn.Module):
         att_x = torch.mul(x,a)
         att_x = torch.sum(att_x,1)
         
-        f = att_x.view(b,self.feat_dim)
+        f = att_x.view(b,self.feat_dim) # shape (b, 2048)
         if not self.training:
             return f
         y = self.classifier(f)
